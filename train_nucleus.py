@@ -9,6 +9,9 @@ import random
 import imageio
 import matplotlib.pyplot as plt
 
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Conv2D, Input, MaxPool2D, UpSampling2D, Concatenate
+
 
 def create_train_and_val_df(path_to_imgfolder, num_of_slices, cutoff_first_slices, cutoff_last_slices, train_spheroid, val_spheroid, test_spheroid):
     img_path = Path(path_to_imgfolder)
@@ -65,6 +68,42 @@ def read_imgs(nucleus, brightfield, plane, number_of_slices):
 
     return bfimg, fluo_target
 
+def create_unet_model(input_shape):
+    def down(connected_layer, num_filters, pool = True):
+        conv = Conv2D(num_filters, 3, padding='same', activation='relu', kernel_initializer = 'glorot_uniform')(connected_layer)
+        conv = Conv2D(num_filters, 3, padding='same', activation='relu', kernel_initializer = 'glorot_uniform')(conv)
+
+        if pool == True:
+            pool = MaxPool2D(2)(conv)
+            return conv, pool
+        else:
+            return conv
+
+    def up(connected_layer, concat_layer, num_filters):
+        up = UpSampling2D(2)(connected_layer)
+        up = Conv2D(num_filters, 2, padding="same", activation = 'relu', kernel_initializer='glorot_uniform')(up)
+        up = Concatenate(axis=3)([concat_layer, up])
+
+        conv = Conv2D(num_filters, 3, padding='same', activation='relu', kernel_initializer='glorot_uniform')(up)
+        conv = Conv2D(num_filters, 3, padding='same', activation='relu', kernel_initializer='glorot_uniform')(conv)
+        return conv
+
+    # "Down"
+    unet_input = Input(input_shape)
+    c1, p1 =  down(unet_input, 64)
+    c2, p2 = down(p1, 128)
+    c3, p3 = down(p2, 256)
+    c4, p4 = down(p3, 512)
+    c5 = down(p4, 1024, pool = False)
+    # "Up"
+    c6 = up(c5, c4, 512)
+    c7 = up(c6, c3, 256)
+    c8 = up(c7, c2, 128)
+    c9 = up(c8, c1, 64)
+    out = Conv2D(1, 1, activation=None)(c9)
+
+    model = Model(inputs=unet_input, outputs = out, name = 'U-net')
+    return model
 
 
 def main():
@@ -103,7 +142,7 @@ def main():
     ds_val = ds_val.prefetch(buffer_size = tf.data.AUTOTUNE)
 
 
-    model = tf.keras.models.load_model("unet_1plane.h5")
+    model = create_unet_model((1024, 1024, num_of_slices))
     opt = tf.keras.optimizers.Adam(learning_rate=1e-05)
 
     model.compile(optimizer = opt, loss = 'mse', metrics = ['mae', 'accuracy'])
@@ -154,7 +193,7 @@ def main():
     ds_val = ds_val.prefetch(buffer_size = tf.data.AUTOTUNE)
 
 
-    model = tf.keras.models.load_model("unet.h5")
+    model = create_unet_model((1024, 1024, num_of_slices))
     opt = tf.keras.optimizers.Adam(learning_rate=1e-05)
 
     model.compile(optimizer = opt, loss = 'mse', metrics = ['mae', 'accuracy'])
@@ -206,7 +245,7 @@ def main():
     ds_val = ds_val.prefetch(buffer_size = tf.data.AUTOTUNE)
 
 
-    model = tf.keras.models.load_model("unet_5plane.h5")
+    model = create_unet_model((1024, 1024, num_of_slices))
     opt = tf.keras.optimizers.Adam(learning_rate=1e-05)
 
     model.compile(optimizer = opt, loss = 'mse', metrics = ['mae', 'accuracy'])
