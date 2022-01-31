@@ -1,4 +1,4 @@
-# Predicting fluorescent labels of spheroids from brightfield microscopy
+# General description
 This repository includes the software to train models to predict fluorescent images from brightfield images as described in the MSc thesis 'Predicting fluorescent labels of spheroids from brightfield microscopy'. This research was performed at the Institute for Molecular Medicine Finland (FIMM) under supervision of dr. Lassi Paavolainen and dr. Vilja Pietiäinen.
 
 ## Abstract
